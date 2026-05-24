@@ -106,6 +106,12 @@ nav button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width
 
 .btn-save{width:100%;background:linear-gradient(135deg,var(--blue),var(--teal));border:none;border-radius:11px;color:#fff;padding:14px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-top:10px;box-shadow:0 4px 18px rgba(26,86,219,.3);transition:.15s}
 .btn-save:active{transform:scale(.98);opacity:.9}
+.btn-draft{width:100%;background:var(--card);border:2px solid var(--amber);border-radius:11px;color:var(--amber);padding:13px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;transition:.15s}
+.btn-draft:active{transform:scale(.98);opacity:.9}
+.draft-banner{background:linear-gradient(135deg,#451a03,#78350f);border:1px solid var(--amber);border-radius:11px;padding:11px 14px;margin-top:10px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.draft-banner .db-l{font-size:11px;color:#fbbf24;font-weight:700}
+.draft-banner .db-s{font-size:10px;color:#d97706;margin-top:1px}
+.draft-banner .db-v{font-family:'DM Mono',monospace;font-size:14px;color:#fcd34d;font-weight:500;flex-shrink:0}
 
 /* ── KPI ── */
 .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 12px 0}
@@ -371,11 +377,23 @@ nav button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width
 
   <!-- ANTEPRIMA + SALVA -->
   <div style="padding:0 12px">
+    <!-- Banner bozza attiva -->
+    <div class="draft-banner" id="draft-banner" style="display:none">
+      <div>
+        <div class="db-l">🟡 Bozza in corso</div>
+        <div class="db-s" id="draft-time"></div>
+      </div>
+      <div class="db-v" id="draft-tot">€0,00</div>
+    </div>
+    <!-- Anteprima live -->
     <div class="ante" id="ante" style="display:none">
       <div><div class="al">Totale Indennità</div><div style="font-size:9px;color:#6ee7b7;margin-top:1px">Anteprima live</div></div>
       <div class="av" id="ante-val">€0,00</div>
     </div>
-    <button class="btn-save" onclick="salvaGiornata()">💾 Salva Giornata</button>
+    <!-- Tasto salva bozza -->
+    <button class="btn-draft" id="btn-draft" onclick="salvaBozza()">🟡 Salva Bozza</button>
+    <!-- Tasto chiudi giornata -->
+    <button class="btn-save" onclick="chiudiGiornata()">✅ Chiudi Giornata</button>
   </div>
 </div>
 
@@ -429,6 +447,7 @@ nav button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width
     <div class="msub" id="m-sub"></div>
     <div id="m-details"></div>
     <div class="det-tot"><span>TOTALE INDENNITÀ</span><span id="m-total"></span></div>
+    <button class="btn-draft" id="m-edit" style="margin-top:10px">✏️ Modifica questa giornata</button>
     <button class="btn-del" id="m-del">🗑 Elimina questa giornata</button>
     <button class="btn-close" onclick="closeM()">Chiudi</button>
   </div>
@@ -816,23 +835,126 @@ function save(d){localStorage.setItem('indennItaloV4',JSON.stringify(d));}
 // ════════════════════════════════════════════════════════
 // SALVA GIORNATA
 // ════════════════════════════════════════════════════════
-function salvaGiornata(){
+// ── BOZZA ────────────────────────────────────────────────────────
+// Salva lo stato corrente come bozza (non nello storico definitivo)
+function salvaBozza(){
   const data=document.getElementById('f-data').value;
   if(!data){showToast('⚠ Inserisci la data!');return;}
   const d={...readForm(),data};
   const r=calcola(d);
-  const g={...d,...r,id:Date.now()};
-  // salva retrib
+  const bozza={...d,...r,
+    id: loadBozza()?.id || Date.now(),
+    bozza:true,
+    bozzaAt: new Date().toISOString()
+  };
   if(d.retrib&&parseFloat(d.retrib)>0)
     localStorage.setItem('indennItalo_retrib',d.retrib);
+  localStorage.setItem('indennItalo_bozza', JSON.stringify(bozza));
+  showToast('🟡 Bozza salvata — '+fmt(r.totale));
+  updDraftBanner();
+  renderAll();
+}
+
+// Chiudi definitivamente la giornata (bozza → storico)
+function chiudiGiornata(){
+  const data=document.getElementById('f-data').value;
+  if(!data){showToast('⚠ Inserisci la data!');return;}
+  const d={...readForm(),data};
+  const r=calcola(d);
+  const bozza=loadBozza();
+  const g={...d,...r,
+    id: bozza?.id || Date.now(),
+    bozza:false,
+    bozzaAt:null
+  };
+  if(d.retrib&&parseFloat(d.retrib)>0)
+    localStorage.setItem('indennItalo_retrib',d.retrib);
+  // Rimuovi bozza
+  localStorage.removeItem('indennItalo_bozza');
+  // Salva nello storico definitivo
   const arr=load();
-  const idx=arr.findIndex(x=>x.data===data);
+  const idx=arr.findIndex(x=>x.data===data||x.id===g.id);
   if(idx>=0)arr.splice(idx,1,g);else arr.push(g);
   arr.sort((a,b)=>a.data.localeCompare(b.data));
   save(arr);
-  showToast('✓ Salvata — '+fmt(r.totale));
+  showToast('✅ Giornata chiusa — '+fmt(r.totale));
   resetForm();
+  updDraftBanner();
   renderAll();
+}
+
+function loadBozza(){
+  try{return JSON.parse(localStorage.getItem('indennItalo_bozza'));}
+  catch{return null;}
+}
+
+function updDraftBanner(){
+  const bozza=loadBozza();
+  const banner=document.getElementById('draft-banner');
+  if(!banner) return;
+  if(bozza){
+    banner.style.display='flex';
+    document.getElementById('draft-tot').textContent=fmt(bozza.totale||0);
+    const t=new Date(bozza.bozzaAt);
+    document.getElementById('draft-time').textContent=
+      'Ultima bozza: '+t.getHours()+':'+String(t.getMinutes()).padStart(2,'0');
+    // Ricarica il form con i dati della bozza
+    caricaBozzaInForm(bozza);
+  } else {
+    banner.style.display='none';
+  }
+}
+
+function caricaBozzaInForm(b){
+  if(!b) return;
+  // Data e turno
+  if(b.data) document.getElementById('f-data').value=b.data;
+  if(b.retrib) document.getElementById('f-retrib').value=b.retrib;
+  document.getElementById('f-turno').value=b.turno||'L';
+  // Ore tot
+  const setHM=(hhId,mmId,dec)=>{
+    if(!dec&&dec!==0)return;
+    const hh=Math.floor(dec), mm=Math.round((dec-hh)*60);
+    const hEl=document.getElementById(hhId), mEl=document.getElementById(mmId);
+    if(hEl)hEl.value=hh||'';
+    if(mEl)mEl.value=mm||'';
+  };
+  setHM('f-tot-hh','f-tot-mm',b.oreTot);
+  setHM('f-cond-hh','f-cond-mm',b.oreCond);
+  setHM('f-nott-hh','f-nott-mm',b.oreNott);
+  setHM('f-fest-hh','f-fest-mm',b.oreFest);
+  setHM('f-strd-hh','f-strd-mm',b.strD);
+  setHM('f-strn-hh','f-strn-mm',b.strN);
+  setHM('f-sfn-hh','f-sfn-mm',b.strFestNott);
+  setHM('f-dist-hh','f-dist-mm',b.oreDist);
+  setHM('f-pern-hh','f-pern-mm',b.orePern);
+  if(b.trasfGg){const el=document.getElementById('f-trasf-gg');if(el)el.value=b.trasfGg;}
+  if(b.trasfPernGg){const el=document.getElementById('f-pern-gg');if(el)el.value=b.trasfPernGg;}
+  // Toggles
+  if(b.dom)    setT('dom',b.dom);
+  if(b.fest)   setT('fest',b.fest);
+  if(b.pasto)  setT('pasto',b.pasto);
+  if(b.rfd)    setT('rfd',b.rfd);
+  if(b.vart)   setT('vart',b.vart);
+  if(b.pasqua) setT('pasqua',b.pasqua);
+  if(b.zdis)   setT('zdis',b.zdis);
+  // Servizi PAB
+  if(b.svcList&&b.svcList.length){
+    svcList=b.svcList.map((s,i)=>({id:i+1,hh:s.hh||'',mm:s.mm||'',label:s.label||''}));
+    nextId=svcList.length+1;
+    renderSvc();
+  }
+  // Voci aggiuntive
+  if(b.voci){
+    VOCI.forEach(v=>{
+      const el=document.getElementById('v-'+v.id);
+      if(el&&b.voci[v.id]!==undefined) el.value=b.voci[v.id];
+    });
+    const noteEl=document.getElementById('v-note');
+    if(noteEl&&b.voci.note) noteEl.value=b.voci.note;
+  }
+  // Aggiorna preview
+  onOreTot(); onOreCond(); calcAnteprima();
 }
 
 function resetForm(){
@@ -856,6 +978,7 @@ function resetForm(){
   if(saved&&parseFloat(saved)>0)
     document.getElementById('f-retrib').value=saved;
   renderSvc();
+  updDraftBanner();
 }
 
 // ════════════════════════════════════════════════════════
@@ -1025,6 +1148,8 @@ function openM(id){
 
   document.getElementById('m-total').textContent=fmt(x.totale||0);
   document.getElementById('m-del').onclick=()=>delG(id);
+  const editBtn=document.getElementById('m-edit');
+  if(editBtn) editBtn.onclick=()=>modificaDaStorico(id);
   document.getElementById('modal').classList.add('open');
 }
 
@@ -1032,6 +1157,20 @@ function delG(id){
   if(!confirm('Eliminare questa giornata?'))return;
   save(load().filter(x=>x.id!==id)); closeM(); renderAll();
   showToast('🗑 Eliminata');
+}
+
+function modificaDaStorico(id){
+  const x=load().find(g=>g.id===id); if(!x) return;
+  // Rimuovi dallo storico e metti in bozza per modifica
+  save(load().filter(g=>g.id!==id));
+  const bozzaEdit={...x, bozza:true, bozzaAt:new Date().toISOString()};
+  localStorage.setItem('indennItalo_bozza', JSON.stringify(bozzaEdit));
+  closeM();
+  resetForm();
+  caricaBozzaInForm(bozzaEdit);
+  goTo('input');
+  showToast('✏️ Giornata aperta per modifica');
+  renderAll();
 }
 function closeMBg(e){if(e.target===document.getElementById('modal'))closeM();}
 function closeM(){document.getElementById('modal').classList.remove('open');}
@@ -1068,6 +1207,12 @@ function showToast(msg){
   setT('dom','NO'); setT('fest','NO'); setT('pasto','NO'); setT('rfd','NO'); setT('vart','NO'); setT('pasqua','NO'); setT('zdis','NO');
   renderSvc();
   renderVoci();
+  // Carica bozza se esiste
+  const bozza=loadBozza();
+  if(bozza){
+    caricaBozzaInForm(bozza);
+    updDraftBanner();
+  }
 })();
 </script>
 
