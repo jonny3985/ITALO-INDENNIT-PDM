@@ -1,0 +1,103 @@
+python3 << 'PYEOF'
+with open('/mnt/user-data/outputs/IndennItalo.html','r') as f:
+    c = f.read()
+
+# Rimuovi il link al manifest esterno e il service worker esterno
+c = c.replace('<link rel="manifest" href="manifest.json">\n', '')
+c = c.replace('<link rel="apple-touch-icon" href="icon.png">\n', '')
+
+# Rimuovi il blocco script service worker esterno
+old_sw = '''<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js')
+      .catch(()=>{});
+  });
+}
+</script>'''
+c = c.replace(old_sw, '')
+
+# Inserisci tutto inline prima di </body>
+inline_block = '''
+<script>
+// ── PWA MANIFEST inline ──────────────────────────────────────────
+const _manifest = {
+  name: "IndennItalo — Macchinista",
+  short_name: "IndennItalo",
+  description: "Calcolo indennità CCAL Italo NTV — Macchinista",
+  start_url: "./",
+  display: "standalone",
+  background_color: "#0a1628",
+  theme_color: "#0a1628",
+  orientation: "portrait",
+  icons: [{src: _iconDataUrl(), sizes:"512x512", type:"image/png", purpose:"any maskable"}]
+};
+function _iconDataUrl() {
+  // Icona SVG inline convertita in data URL
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="80" fill="#0a1628"/>
+    <circle cx="256" cy="256" r="220" fill="#0a1628" stroke="#0891b2" stroke-width="16"/>
+    <rect x="196" y="120" width="120" height="220" rx="24" fill="#2563eb"/>
+    <rect x="196" y="100" width="120" height="50" rx="16" fill="#1a56db"/>
+    <rect x="216" y="150" width="80" height="55" rx="10" fill="#34d399"/>
+    <rect x="216" y="220" width="80" height="55" rx="10" fill="#34d399"/>
+    <rect x="176" y="340" width="160" height="18" rx="4" fill="#34d399"/>
+    <rect x="176" y="310" width="160" height="18" rx="4" fill="#64748b"/>
+    <rect x="188" y="310" width="12" height="48" rx="3" fill="#34d399"/>
+    <rect x="312" y="310" width="12" height="48" rx="3" fill="#34d399"/>
+  </svg>`;
+  return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+}
+
+// Inietta manifest dinamicamente
+(function injectManifest() {
+  const blob = new Blob([JSON.stringify(_manifest)], {type:'application/manifest+json'});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('link');
+  link.rel = 'manifest'; link.href = url;
+  document.head.appendChild(link);
+  // Apple touch icon
+  const icon = document.createElement('link');
+  icon.rel = 'apple-touch-icon'; icon.href = _iconDataUrl();
+  document.head.appendChild(icon);
+})();
+
+// ── SERVICE WORKER inline (via blob URL) ─────────────────────────
+if('serviceWorker' in navigator) {
+  const swCode = `
+const CACHE='indenn-italo-v2';
+self.addEventListener('install', e=>{
+  self.skipWaiting();
+});
+self.addEventListener('activate', e=>{
+  e.waitUntil(caches.keys().then(keys=>
+    Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))
+  ));
+  self.clients.claim();
+});
+self.addEventListener('fetch', e=>{
+  if(e.request.method!=='GET') return;
+  e.respondWith(
+    caches.match(e.request).then(cached=>{
+      const net = fetch(e.request).then(res=>{
+        if(res && res.status===200)
+          caches.open(CACHE).then(c=>c.put(e.request, res.clone()));
+        return res;
+      }).catch(()=>cached);
+      return cached || net;
+    })
+  );
+});`;
+  const blob = new Blob([swCode], {type:'application/javascript'});
+  const swUrl = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl, {scope:'./'}).catch(()=>{});
+}
+</script>'''
+
+c = c.replace('</body>\n</html>', inline_block + '\n</body>\n</html>')
+
+with open('/mnt/user-data/outputs/index.html', 'w') as f:
+    f.write(c)
+
+print(f"index.html creato: {len(c)} chars, {c.count(chr(10))} righe")
+PYEOF
