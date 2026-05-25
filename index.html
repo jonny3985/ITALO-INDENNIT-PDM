@@ -281,7 +281,7 @@ nav button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width
 
       <!-- Straord diurno -->
       <div class="field">
-        <label>Ore Straord. Diurne <span class="badge">18%</span></label>
+        <label>Ore Straord. Diurne <span class="badge">ro × 1,18</span></label>
         <div class="hm-wrap">
           <input class="inp inp-mono" type="number" id="f-strd-hh" placeholder="hh" min="0" max="10" step="1" inputmode="numeric" oninput="calcAnteprima()">
           <span class="hm-sep">,</span>
@@ -291,7 +291,7 @@ nav button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width
 
       <!-- Straord notturno -->
       <div class="field">
-        <label>Ore Straord. Notturne <span class="badge">35%</span></label>
+        <label>Ore Straord. Notturne <span class="badge">ro × 1,35</span></label>
         <div class="hm-wrap">
           <input class="inp inp-mono" type="number" id="f-strn-hh" placeholder="hh" min="0" max="10" step="1" inputmode="numeric" oninput="calcAnteprima()">
           <span class="hm-sep">,</span>
@@ -301,7 +301,7 @@ nav button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width
 
       <!-- Straord notturno festivo — cod.006105 -->
       <div class="field ff">
-        <label>Ore Straord. Notturno Festivo <span class="badge">35% — cod.006105</span></label>
+        <label>Ore Straord. Notturno Festivo <span class="badge">ro × 1,35 — cod.006105</span></label>
         <div class="hm-wrap">
           <input class="inp inp-mono" type="number" id="f-sfn-hh" placeholder="hh" min="0" max="10" step="1" inputmode="numeric" oninput="calcAnteprima()">
           <span class="hm-sep">,</span>
@@ -826,9 +826,10 @@ function calcola(d){
   // Gettone disponibilità
   const gettone=(parseFloat(d.voci?.gettone)||0)*GETTONE_DISP;
 
-  // Straordinari
-  const strDiurno=ro>0?d.strD*(ro*0.18):0;
-  const strNott=ro>0?d.strN*(ro*0.35):0;
+  // Straordinari: ore × retrib.oraria × (1 + maggiorazione)
+  // = paga base delle ore + maggiorazione percentuale
+  const strDiurno   = ro>0 ? d.strD*(ro*1.18) : 0;  // ore × ro × 1,18
+  const strNott     = ro>0 ? d.strN*(ro*1.35) : 0;  // ore × ro × 1,35
 
   // Ind. notturno €2,40/h
   const indNott=d.oreNott*IND_NOTT_RATE;
@@ -837,10 +838,11 @@ function calcola(d){
   const indDom=d.dom==='SI'?(d.oreTot<2?IND_DOM_CORTA:IND_DOM_LUNGA):0;
 
   // Ind. lavoro festivo (35% su ret.oraria) — per festivi nazionali
-  const indFest=ro>0&&d.fest==='SI'?d.oreFest*(ro*0.35):0;
+  // Ind. lavoro festivo: ore festive × ro × 1,35 (paga base + 35%)
+  const indFest=ro>0&&d.fest==='SI'?d.oreFest*(ro*1.35):0;
 
-  // Straord. notturno festivo 35% — cod.006105 (ora in sezione Ore)
-  const strFestNottV=ro>0?d.strFestNott*(ro*0.35):0;
+  // Straord. notturno festivo 35% — ore × ro × 1,35 — cod.006105
+  const strFestNottV=ro>0?d.strFestNott*(ro*1.35):0;
 
   // Variazione turno €7 fissi — toggle
   const variazioneT=d.vart==='SI'?VAR_TURNO:0;
@@ -1091,8 +1093,8 @@ function renderDash(){
     {k:'riservaP',l:'Riserva Pura'},{k:'riservaRFD',l:'Riserva con RFD'},
     {k:'gettone',l:'Gettone Disponibilità'},{k:'variazioneT',l:'Variazione Turno (€7)'},
     {k:'indNott',l:'Ind. Notturno'},{k:'indDom',l:'Ind. Domenicale'},
-    {k:'indFest',l:'Ind. Lavoro Festivo'},{k:'strDiurno',l:'Straord. Diurno 18%'},
-    {k:'strNott',l:'Straord. Notturno 35%'},{k:'strFestNottV',l:'Straord. Nott. Festivo 35%'},
+    {k:'indFest',l:'Ind. Lavoro Festivo'},{k:'strDiurno',l:'Straord. Diurno (ro×1,18)'},
+    {k:'strNott',l:'Straord. Notturno (ro×1,35)'},{k:'strFestNottV',l:'Straord. Nott. Festivo (ro×1,35)'},
     {k:'ripComp',l:'Riposi Compensativi'},{k:'indSind',l:'Ind. Sindacale'},
   ];
   const items=voci.map(v=>({l:v.l,val:sumK(anno,v.k)})).filter(x=>x.val>0).sort((a,b)=>b.val-a.val);
@@ -1188,12 +1190,12 @@ function openM(id){
     {l:'Riserva Pura',                   v:x.riservaP},
     {l:'Riserva con RFD',                v:x.riservaRFD},
     {l:'Gettone Disponibilità',          v:x.gettone},
-    {l:'Straord. Diurno 18%',            v:x.strDiurno},
-    {l:'Straord. Notturno 35%',          v:x.strNott},
-    {l:'Straord. Notturno Festivo 35%',  v:x.strFestNottV,extra:'<div class="dm-e">'+decToLabel(x.strFestNott||0)+' × ret.oraria × 35%</div>'},
+    {l:'Straord. Diurno (ro×1,18)',       v:x.strDiurno},
+    {l:'Straord. Notturno (ro×1,35)',     v:x.strNott},
+    {l:'Straord. Nott. Festivo (ro×1,35)',v:x.strFestNottV,extra:'<div class="dm-e">'+decToLabel(x.strFestNott||0)+' × ro × 1,35</div>'},
     {l:'Ind. Notturno (€2,40/h)',        v:x.indNott},
     {l:'Ind. Domenicale',                v:x.indDom},
-    {l:'Ind. Lavoro Festivo 35%',        v:x.indFest},
+    {l:'Ind. Lavoro Festivo (ro×1,35)',  v:x.indFest},
     {l:'Riposi Compensativi',            v:x.ripComp},
     {l:'Ind. Sindacale FIT-CISL',        v:x.indSind},
   ].filter(r=>r.v&&r.v>0.001);
@@ -1343,9 +1345,9 @@ function generaPDF(){
     {k:'riservaP',l:'Riserva Pura'},
     {k:'riservaRFD',l:'Riserva con RFD'},
     {k:'gettone',l:'Gettone Disponibilità'},
-    {k:'strDiurno',l:'Straord. Diurno 18%'},
-    {k:'strNott',l:'Straord. Notturno 35%'},
-    {k:'strFestNottV',l:'Straord. Nott. Festivo 35%'},
+    {k:'strDiurno',l:'Straord. Diurno (ro×1,18)'},
+    {k:'strNott',l:'Straord. Notturno (ro×1,35)'},
+    {k:'strFestNottV',l:'Straord. Nott. Festivo (ro×1,35)'},
     {k:'indNott',l:'Ind. Notturno'},
     {k:'indDom',l:'Ind. Domenicale'},
     {k:'indFest',l:'Ind. Lavoro Festivo'},
