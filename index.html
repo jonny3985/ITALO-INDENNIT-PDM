@@ -163,6 +163,22 @@ nav button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width
 .empty{text-align:center;padding:52px 20px;color:var(--text2)}
 .empty svg{width:40px;height:40px;opacity:.2;margin-bottom:10px}
 .empty p{font-size:13px;line-height:1.6}
+/* ── EXPORT ── */
+.exp-row{background:var(--card);border:1px solid var(--border);border-radius:10px;margin:4px 12px;padding:11px 13px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:.15s;-webkit-user-select:none}
+.exp-row.selected{border-color:var(--blue2);background:var(--surface)}
+.exp-row:active{opacity:.8}
+.exp-check{width:20px;height:20px;border-radius:6px;border:2px solid var(--border);background:var(--pill);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:.2s}
+.exp-row.selected .exp-check{background:var(--blue2);border-color:var(--blue2)}
+.exp-check svg{width:12px;height:12px;stroke:#fff;fill:none;stroke-width:3;opacity:0;transition:.2s}
+.exp-row.selected .exp-check svg{opacity:1}
+.exp-info{flex:1;min-width:0}
+.exp-date{font-size:13px;font-weight:600}
+.exp-tags{display:flex;gap:3px;margin-top:3px;flex-wrap:wrap}
+.exp-tot{font-family:'DM Mono',monospace;font-size:15px;color:var(--euro);font-weight:500;flex-shrink:0}
+.exp-toolbar{position:sticky;bottom:82px;left:0;right:0;background:var(--navy2);border-top:1px solid var(--border);padding:10px 12px;display:flex;gap:8px;align-items:center;z-index:40}
+.exp-count{font-size:12px;color:var(--text2);flex:1}
+.btn-exp{background:linear-gradient(135deg,var(--red),#b91c1c);border:none;border-radius:10px;color:#fff;padding:11px 18px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.btn-selall{background:var(--pill);border:1.5px solid var(--border);border-radius:10px;color:var(--text2);padding:10px 14px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
 #toast{position:fixed;top:18px;left:50%;transform:translateX(-50%) translateY(-90px);background:#065f46;color:#d1fae5;padding:9px 20px;border-radius:30px;font-weight:700;font-size:12px;z-index:999;transition:.3s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;border:1px solid #059669}
 #toast.show{transform:translateX(-50%) translateY(0)}
 .sect-divider{height:1px;background:var(--border);margin:0 12px}
@@ -195,6 +211,11 @@ nav button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width
       <div class="field"><label>Retrib. Oraria € <span class="badge-auto" style="font-size:8px">AUTO</span></label>
         <input class="inp inp-mono" type="number" id="f-retrib" placeholder="0.00" min="0" step="0.01"
           oninput="onRetribChange()" style="border-color:var(--teal)">
+      </div>
+      <div class="field"><label>Minimo Contrattuale € <span class="badge-auto" style="font-size:8px">AUTO</span></label>
+        <input class="inp inp-mono" type="number" id="f-minimo" placeholder="es. 2037.38" min="0" step="0.01"
+          oninput="onMinimoChange()" style="border-color:var(--teal)">
+        <div style="font-size:9px;color:var(--muted);margin-top:3px">Usato per Riposi Compensativi (÷26)</div>
       </div>
     </div>
   </div>
@@ -427,6 +448,19 @@ nav button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width
   <div id="storico-list" style="padding-bottom:8px"></div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════
+     PAGINA: ESPORTA PDF
+═══════════════════════════════════════════════════════ -->
+<div id="page-export" class="page">
+  <div class="ph"><h1>📄 Esporta PDF</h1><p id="exp-subtitle">Seleziona le giornate da includere</p></div>
+  <div id="exp-list" style="padding-bottom:100px"></div>
+  <div class="exp-toolbar">
+    <span class="exp-count" id="exp-count">0 selezionate</span>
+    <button class="btn-selall" onclick="toggleSelAll()">Seleziona tutte</button>
+    <button class="btn-exp" onclick="generaPDF()">📄 Genera PDF</button>
+  </div>
+</div>
+
 <!-- NAV -->
 <nav>
   <button class="active" onclick="goTo('input')" id="nav-input">
@@ -437,6 +471,9 @@ nav button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width
   </button>
   <button onclick="goTo('storico')" id="nav-storico">
     <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Storico
+  </button>
+  <button onclick="goTo('export')" id="nav-export">
+    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6M9 15l3 3 3-3"/></svg>PDF
   </button>
 </nav>
 
@@ -488,7 +525,7 @@ const VOCI = [
    type:'select', opts:['','Base','Base+25','Tardiva','Tardiva+25']},
   {id:'gettone',  label:'Gettone Disponibilità',        sub:'€70,00 per chiamata — cod.003301',
    type:'qty', unit:'×', rate:70, step:1},
-  {id:'rip-comp', label:'Riposi Compensativi',          sub:'Gg × ret.giornaliera — cod.000149',
+  {id:'rip-comp', label:'Riposi Compensativi',          sub:'Gg × (minimo ÷ 26) — cod.000149',
    type:'qty', unit:'gg', step:1, note:'rc'},
   {id:'ind-sind', label:'Indennità Sindacale FIT-CISL', sub:'€16,00 / gg — cod.003410',
    type:'qty', unit:'gg', rate:16, step:1},
@@ -690,6 +727,19 @@ function onRetribChange(){
   if(val&&parseFloat(val)>0) localStorage.setItem('indennItalo_retrib',val);
   calcAnteprima();
 }
+function onMinimoChange(){
+  const val=document.getElementById('f-minimo').value;
+  if(val&&parseFloat(val)>0) localStorage.setItem('indennItalo_minimo',val);
+  // aggiorna label sub della voce rip-comp
+  const retG=parseFloat(val)/26;
+  const ripEl=document.getElementById('v-rip-comp');
+  if(ripEl){
+    const parent=ripEl.closest('.voce');
+    const sub=parent?.querySelector('.vs');
+    if(sub&&retG>0) sub.textContent='Gg × '+fmt(retG)+'/gg — cod.000149';
+  }
+  calcAnteprima();
+}
 
 function onOreTot(){
   const dec=hm(document.getElementById('f-tot-hh').value, document.getElementById('f-tot-mm').value);
@@ -714,6 +764,7 @@ function readForm(){
   return {
     turno:   g('f-turno').value,
     retrib:  g('f-retrib').value,
+    minimo:  g('f-minimo')?.value||'',
     oreTot:  hm(g('f-tot-hh').value,  g('f-tot-mm').value),
     oreCond: hm(g('f-cond-hh').value, g('f-cond-mm').value),  // solo contatore
     oreNott: hm(g('f-nott-hh').value, g('f-nott-mm').value),
@@ -800,8 +851,10 @@ function calcola(d){
   // Indennità Zona Disagiata Impianto — €10 fissi
   const indZdis=d.zdis==='SI'?IND_ZONA_DISAGIATA:0;
 
-  // Riposi compensativi (ret.oraria × 7.5h = ret.giornaliera)
-  const ripComp=ro>0?(parseFloat(d.voci?.['rip-comp'])||0)*(ro*7.5):0;
+  // Riposi compensativi: minimo contrattuale ÷ 26 giorni
+  const minimo=parseFloat(d.minimo)||0;
+  const retGiornaliera=minimo>0?minimo/26:0;
+  const ripComp=retGiornaliera>0?(parseFloat(d.voci?.['rip-comp'])||0)*retGiornaliera:0;
 
   // Indennità sindacale
   const indSind=(parseFloat(d.voci?.['ind-sind'])||0)*IND_SIND;
@@ -849,6 +902,8 @@ function salvaBozza(){
   };
   if(d.retrib&&parseFloat(d.retrib)>0)
     localStorage.setItem('indennItalo_retrib',d.retrib);
+  if(d.minimo&&parseFloat(d.minimo)>0)
+    localStorage.setItem('indennItalo_minimo',d.minimo);
   localStorage.setItem('indennItalo_bozza', JSON.stringify(bozza));
   showToast('🟡 Bozza salvata — '+fmt(r.totale));
   updDraftBanner();
@@ -869,6 +924,8 @@ function chiudiGiornata(){
   };
   if(d.retrib&&parseFloat(d.retrib)>0)
     localStorage.setItem('indennItalo_retrib',d.retrib);
+  if(d.minimo&&parseFloat(d.minimo)>0)
+    localStorage.setItem('indennItalo_minimo',d.minimo);
   // Rimuovi bozza
   localStorage.removeItem('indennItalo_bozza');
   // Salva nello storico definitivo
@@ -910,6 +967,10 @@ function caricaBozzaInForm(b){
   // Data e turno
   if(b.data) document.getElementById('f-data').value=b.data;
   if(b.retrib) document.getElementById('f-retrib').value=b.retrib;
+  if(b.minimo){
+    const el=document.getElementById('f-minimo');
+    if(el){el.value=b.minimo;onMinimoChange();}
+  }
   document.getElementById('f-turno').value=b.turno||'L';
   // Ore tot
   const setHM=(hhId,mmId,dec)=>{
@@ -973,10 +1034,15 @@ function resetForm(){
   document.getElementById('ante').style.display='none';
   document.getElementById('inc-prev').textContent='';
   document.getElementById('cond-prev').textContent='';
-  // riporta retrib automaticamente
+  // riporta retrib e minimo automaticamente
   const saved=localStorage.getItem('indennItalo_retrib');
   if(saved&&parseFloat(saved)>0)
     document.getElementById('f-retrib').value=saved;
+  const savedMin=localStorage.getItem('indennItalo_minimo');
+  if(savedMin&&parseFloat(savedMin)>0){
+    document.getElementById('f-minimo').value=savedMin;
+    onMinimoChange();
+  }
   renderSvc();
   updDraftBanner();
 }
@@ -1185,6 +1251,220 @@ function goTo(p){
   document.getElementById('nav-'+p).classList.add('active');
   if(p==='dash') renderDash();
   if(p==='storico') renderStorico();
+  if(p==='export') renderExport();
+}
+
+// ════════════════════════════════════════════════════════
+// EXPORT PDF
+// ════════════════════════════════════════════════════════
+let selectedIds = new Set();
+
+function renderExport(){
+  const arr=load();
+  selectedIds=new Set();
+  updExpCount();
+  const el=document.getElementById('exp-list');
+  if(!arr.length){
+    el.innerHTML='<div class="empty"><p>Nessuna giornata salvata.</p></div>';
+    return;
+  }
+  // Raggruppa per mese
+  const byM={};
+  [...arr].reverse().forEach(x=>{
+    const d=new Date(x.data+'T12:00:00');
+    const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    const l=MESI[d.getMonth()]+' '+d.getFullYear();
+    if(!byM[k])byM[k]={l,items:[]};
+    byM[k].items.push(x);
+  });
+  el.innerHTML=Object.keys(byM).sort().reverse().map(k=>{
+    const m=byM[k];
+    const totM=m.items.reduce((s,x)=>s+(x.totale||0),0);
+    return '<div class="month-hdr"><span>'+m.l+'</span><span class="mv">'+fmt(totM)+'</span></div>'
+      +m.items.map(x=>{
+        const d=dow(x.data);
+        const tags=[GG[d]];
+        if(x.dom==='SI') tags.push('Dom');
+        if(x.fest==='SI') tags.push('Festivo');
+        if(x.voci?.pdt) tags.push(x.voci.pdt);
+        return '<div class="exp-row" id="er-'+x.id+'" onclick="toggleSel('+x.id+')">'
+          +'<div class="exp-check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>'
+          +'<div class="exp-info">'
+          +'<div class="exp-date">'+fmtS(x.data)+'</div>'
+          +'<div class="exp-tags">'+tags.map(t=>'<span class="tag">'+t+'</span>').join('')+'</div>'
+          +'</div>'
+          +'<div class="exp-tot">'+fmt(x.totale||0)+'</div>'
+          +'</div>';
+      }).join('');
+  }).join('');
+}
+
+function toggleSel(id){
+  if(selectedIds.has(id)) selectedIds.delete(id);
+  else selectedIds.add(id);
+  const row=document.getElementById('er-'+id);
+  if(row) row.classList.toggle('selected', selectedIds.has(id));
+  updExpCount();
+}
+
+function toggleSelAll(){
+  const arr=load();
+  if(selectedIds.size===arr.length){
+    selectedIds.clear();
+    document.querySelectorAll('.exp-row').forEach(r=>r.classList.remove('selected'));
+  } else {
+    arr.forEach(x=>selectedIds.add(x.id));
+    document.querySelectorAll('.exp-row').forEach(r=>r.classList.add('selected'));
+  }
+  updExpCount();
+}
+
+function updExpCount(){
+  const el=document.getElementById('exp-count');
+  const tot=load().filter(x=>selectedIds.has(x.id)).reduce((s,x)=>s+(x.totale||0),0);
+  if(el) el.textContent=selectedIds.size+' selezionate · '+fmt(tot);
+}
+
+function generaPDF(){
+  if(selectedIds.size===0){showToast('⚠ Seleziona almeno una giornata');return;}
+  const arr=load().filter(x=>selectedIds.has(x.id)).sort((a,b)=>a.data.localeCompare(b.data));
+
+  const VOCI_LABEL=[
+    {k:'pab',l:'PAB Permanenza a Bordo'},
+    {k:'trasferta',l:'Trasferta'},
+    {k:'trasfPernotto',l:'Trasferta con Pernotto'},
+    {k:'incentivo',l:'Incentivo Efficienza'},
+    {k:'buono',l:'Buono Pasto'},
+    {k:'mancataPasto',l:'Mancata Refezione'},
+    {k:'pdt',l:'TD Turno Disponibile'},
+    {k:'variazioneT',l:'Variazione Turno'},
+    {k:'indPasqua',l:'Indennità Pasqua'},
+    {k:'indZdis',l:'Zona Disagiata Impianto'},
+    {k:'riservaP',l:'Riserva Pura'},
+    {k:'riservaRFD',l:'Riserva con RFD'},
+    {k:'gettone',l:'Gettone Disponibilità'},
+    {k:'strDiurno',l:'Straord. Diurno 18%'},
+    {k:'strNott',l:'Straord. Notturno 35%'},
+    {k:'strFestNottV',l:'Straord. Nott. Festivo 35%'},
+    {k:'indNott',l:'Ind. Notturno'},
+    {k:'indDom',l:'Ind. Domenicale'},
+    {k:'indFest',l:'Ind. Lavoro Festivo'},
+    {k:'ripComp',l:'Riposi Compensativi'},
+    {k:'indSind',l:'Ind. Sindacale FIT-CISL'},
+  ];
+
+  // Calcola totali generali
+  const grandTotal=arr.reduce((s,x)=>s+(x.totale||0),0);
+  const totPerVoce={};
+  VOCI_LABEL.forEach(v=>{totPerVoce[v.k]=arr.reduce((s,x)=>s+(x[v.k]||0),0);});
+
+  // Raggruppa per mese per intestazioni
+  const byM={};
+  arr.forEach(x=>{
+    const d=new Date(x.data+'T12:00:00');
+    const k=MESI[d.getMonth()]+' '+d.getFullYear();
+    if(!byM[k])byM[k]=[];
+    byM[k].push(x);
+  });
+
+  let html=`<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8">
+<title>IndennItalo — Resoconto</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;font-size:11px;color:#1e293b;background:#fff;padding:20px}
+  h1{font-size:18px;color:#0a1628;margin-bottom:4px}
+  .sub{font-size:11px;color:#64748b;margin-bottom:20px}
+  .mese-hdr{background:#0a1628;color:#fff;padding:7px 12px;font-size:12px;font-weight:700;
+    margin:18px 0 6px;border-radius:6px;display:flex;justify-content:space-between}
+  .giornata{border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:10px;page-break-inside:avoid}
+  .g-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;border-bottom:1px solid #f1f5f9;padding-bottom:6px}
+  .g-data{font-size:13px;font-weight:700;color:#0a1628}
+  .g-turno{font-size:10px;color:#64748b;margin-top:2px}
+  .g-tot{font-size:15px;font-weight:700;color:#059669}
+  .g-pab{font-size:10px;color:#2563eb;margin-top:1px;text-align:right}
+  .voci-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px 16px}
+  .voce-item{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dotted #f1f5f9;font-size:10px}
+  .voce-item:last-child{border:none}
+  .voce-l{color:#475569}
+  .voce-v{font-weight:600;color:#1e293b}
+  .note-box{background:#f8fafc;border-radius:5px;padding:6px 8px;margin-top:6px;font-size:10px;color:#475569;font-style:italic}
+  .riepilogo{margin-top:24px;border:2px solid #0a1628;border-radius:8px;padding:14px;page-break-inside:avoid}
+  .riep-title{font-size:13px;font-weight:700;color:#0a1628;margin-bottom:10px;border-bottom:1px solid #e2e8f0;padding-bottom:6px}
+  .riep-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 20px}
+  .riep-item{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dotted #e2e8f0;font-size:10px}
+  .riep-item:last-child{border:none}
+  .grand-total{display:flex;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:2px solid #0a1628;font-size:14px;font-weight:700;color:#0a1628}
+  .tag{display:inline-block;background:#f1f5f9;color:#475569;padding:1px 6px;border-radius:10px;font-size:9px;margin-right:3px}
+  @media print{body{padding:10px}}
+</style></head><body>
+<h1>🚆 IndennItalo — Resoconto Indennità</h1>
+<div class="sub">Macchinista CCAL Italo NTV · ${arr.length} giornate · Generato il ${new Date().toLocaleDateString('it-IT')}</div>`;
+
+  // Giornate per mese
+  Object.entries(byM).forEach(([mese, giornate])=>{
+    const totMese=giornate.reduce((s,x)=>s+(x.totale||0),0);
+    html+=`<div class="mese-hdr"><span>${mese}</span><span>${fmt(totMese)}</span></div>`;
+    giornate.forEach(x=>{
+      const d=new Date(x.data+'T12:00:00');
+      const turnoLabel=x.turno==='L'?'Lavoro':'Riserva';
+      const tags=[];
+      if(x.dom==='SI') tags.push('Domenica');
+      if(x.fest==='SI') tags.push('Festivo');
+      if(x.pasqua==='SI') tags.push('Pasqua');
+      if(x.voci?.pdt) tags.push('TD '+x.voci.pdt);
+      if(x.vart==='SI') tags.push('Var. Turno');
+
+      const vociAttive=VOCI_LABEL.filter(v=>x[v.k]&&x[v.k]>0.001);
+      // Dividi in due colonne
+      const col1=vociAttive.filter((_,i)=>i%2===0);
+      const col2=vociAttive.filter((_,i)=>i%2===1);
+      const maxRows=Math.max(col1.length,col2.length);
+      let vociHtml='<div class="voci-grid">';
+      for(let i=0;i<maxRows;i++){
+        const v1=col1[i],v2=col2[i];
+        vociHtml+='<div class="voce-item">'+(v1?'<span class="voce-l">'+v1.l+'</span><span class="voce-v">'+fmt(v1[v1.k]||x[v1.k])+'</span>':'')+'</div>';
+        vociHtml+='<div class="voce-item">'+(v2?'<span class="voce-l">'+v2.l+'</span><span class="voce-v">'+fmt(v2[v2.k]||x[v2.k])+'</span>':'')+'</div>';
+      }
+      // fix: usa x[v.k]
+      vociHtml='<div class="voci-grid">'+vociAttive.map(v=>
+        '<div class="voce-item"><span class="voce-l">'+v.l+'</span><span class="voce-v">'+fmt(x[v.k])+'</span></div>'
+      ).join('')+'</div>';
+
+      html+=`<div class="giornata">
+        <div class="g-header">
+          <div>
+            <div class="g-data">${GGF[d.getDay()]} ${fmtS(x.data)}</div>
+            <div class="g-turno">${turnoLabel}${tags.length?' · '+tags.join(' · '):''}</div>
+          </div>
+          <div>
+            <div class="g-tot">${fmt(x.totale||0)}</div>
+            ${x.totOrePAB>0?'<div class="g-pab">'+decToLabel(x.totOrePAB)+' a bordo</div>':''}
+          </div>
+        </div>
+        ${vociHtml}
+        ${x.voci?.note?'<div class="note-box">📝 '+x.voci.note+'</div>':''}
+      </div>`;
+    });
+  });
+
+  // Riepilogo finale
+  const vociRiep=VOCI_LABEL.filter(v=>totPerVoce[v.k]>0.001);
+  html+=`<div class="riepilogo">
+    <div class="riep-title">📊 Riepilogo Totale per Voce</div>
+    <div class="riep-grid">${vociRiep.map(v=>
+      '<div class="riep-item"><span>'+v.l+'</span><span style="font-weight:600">'+fmt(totPerVoce[v.k])+'</span></div>'
+    ).join('')}</div>
+    <div class="grand-total"><span>TOTALE COMPLESSIVO</span><span>${fmt(grandTotal)}</span></div>
+  </div>
+</body></html>`;
+
+  // Apri in nuova finestra e stampa → PDF
+  const w=window.open('','_blank');
+  if(!w){showToast('⚠ Abilita i popup in Safari');return;}
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(()=>{w.print();},500);
 }
 
 function showToast(msg){
